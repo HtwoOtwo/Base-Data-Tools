@@ -8,3 +8,6 @@
 *.pth
 *.py~
 *.sh~
+
+# test
+test.py
