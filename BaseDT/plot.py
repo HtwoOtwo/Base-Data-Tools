@@ -106,6 +106,8 @@ def imshow_det_bboxes(img,
     Returns:
         ndarray: The image with bboxes drawn on it.
     """
+    bboxes = np.array(bboxes)
+    labels = np.array(labels)
     assert bboxes.ndim == 2
     assert labels.ndim == 1
     assert bboxes.shape[0] == labels.shape[0]
