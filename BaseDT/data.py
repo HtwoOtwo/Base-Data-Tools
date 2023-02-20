@@ -1,5 +1,6 @@
 # 导入工具库
 import numpy as np
+import matplotlib.pyplot as plt
 import cv2
 import jieba
 from sklearn.feature_extraction.text import CountVectorizer
@@ -66,21 +67,24 @@ class ImageData(object):
                 self._rgb2gray()
             else:
                 self._to3channel()
-            if self.get_attribute("size") or self.get_attribute("size_keep_ratio"):
-                size = self.get_attribute("size")
-                size_keep_ratio = self.get_attribute("size_keep_ratio")
-                self._resize(size, size_keep_ratio)
-            if self.get_attribute("crop_size"):
-                crop_size = self.get_attribute("crop_size")
-                self._crop(crop_size)
-            if self.get_attribute("normalize")==True:
-                #TODO 需检查维度
-                mean = self.get_attribute("mean")
-                std = self.get_attribute("std")
-                self._normalize(mean, std)
-            if self.get_attribute("pad_size_divisor"):
-                pad_size_divisor = self.get_attribute("pad_size_divisor")
-                self._pad(size_divisor=pad_size_divisor)
+            #需要考虑各种操作顺序的灵活性，循环遍历参数列表来实现
+            for key in kwargs.keys():
+                if key == "size" or key == "size_keep_ratio":
+                    size = self.get_attribute("size")
+                    size_keep_ratio = self.get_attribute("size_keep_ratio")
+                    self._resize(size, size_keep_ratio)
+                if key == "crop_size":
+                    crop_size = self.get_attribute("crop_size")
+                    self._crop(crop_size)
+                if key == "normalize":
+                    #TODO 需检查维度
+                    if self.get_attribute("normalize") == True:
+                        mean = self.get_attribute("mean")
+                        std = self.get_attribute("std")
+                        self._normalize(mean, std)
+                if key == "pad_size_divisor":
+                    pad_size_divisor = self.get_attribute("pad_size_divisor")
+                    self._pad(size_divisor=pad_size_divisor)
 
     def to_tensor(self):
         if self.get_attribute("to_rgb"):
@@ -282,19 +286,13 @@ class ImageData(object):
     def _flip(self):
         pass
 
-    def show(self, raw = False, win_name='', wait_time=0):
-        if raw: cv2.imshow(win_name, self.raw_value)
-        else: cv2.imshow(win_name, self.value)
-        if wait_time == 0:  # prevent from hanging if windows was closed
-            while True:
-                ret = cv2.waitKey(1)
-
-                closed = cv2.getWindowProperty(win_name, cv2.WND_PROP_VISIBLE) < 1
-                # if user closed window or if some key pressed
-                if closed or ret != -1:
-                    break
-        else:
-            ret = cv2.waitKey(wait_time)
+    def show(self, raw = False):
+        if raw: img = self.raw_value
+        else: img = self.value
+        if len(img.shape) == 3:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        plt.imshow(img)
+        plt.show()
 
     def map_orig_coords(self, box):
         #TODO 暂时只支持box的映射，后续应该支持单纯的坐标映射
@@ -330,7 +328,7 @@ class TextData(object):
         if type(self.raw_value) == dict or type(self.raw_value[0]) == dict:
             self.text_type = "dict"
             if type(self.raw_value) == dict: self.value = [self.raw_value]
-        if type(self.raw_value) == str or type(self.raw_value[0]) == str:
+        elif type(self.raw_value) == str or type(self.raw_value[0]) == str:
             self.text_type = "str"
             if type(self.raw_value) == str: self.value = [self.raw_value]
         else:
