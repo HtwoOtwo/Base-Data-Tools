@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from enum import Enum
+import matplotlib.pyplot as plt
 # def draw_boxes(image, boxes, labels = None, color=(0, 0, 255), thickness=2):
 #     font_scale = image.shape[0] / 500
 #     font = cv2.FONT_HERSHEY_SIMPLEX
@@ -56,7 +57,7 @@ def color_val(color):
     else:
         raise TypeError(f'Invalid type for color: {type(color)}')
 
-def imshow(img, win_name='', wait_time=0):
+def imshow(img, need_win = False, win_name='', wait_time=0):
     """Show an image.
 
     Args:
@@ -64,25 +65,33 @@ def imshow(img, win_name='', wait_time=0):
         win_name (str): The window name.
         wait_time (int): Value of waitKey param.
     """
-    cv2.imshow(win_name, img)
-    if wait_time == 0:  # prevent from hanging if windows was closed
-        while True:
-            ret = cv2.waitKey(1)
+    # 转RGB
+    if len(img.shape) == 3:
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    if need_win:
+        cv2.imshow(win_name, img)
+        if wait_time == 0:  # prevent from hanging if windows was closed
+            while True:
+                ret = cv2.waitKey(1)
 
-            closed = cv2.getWindowProperty(win_name, cv2.WND_PROP_VISIBLE) < 1
-            # if user closed window or if some key pressed
-            if closed or ret != -1:
-                break
+                closed = cv2.getWindowProperty(win_name, cv2.WND_PROP_VISIBLE) < 1
+                # if user closed window or if some key pressed
+                if closed or ret != -1:
+                    break
+        else:
+            ret = cv2.waitKey(wait_time)
     else:
-        ret = cv2.waitKey(wait_time)
+        plt.imshow(img)
+        plt.show()
+
 
 def imshow_det_bboxes(img,
                       bboxes,
                       labels,
                       class_names=None,
                       score_thr=0,
-                      bbox_color='green',
-                      text_color='green',
+                      bbox_color=None,
+                      text_color=None,
                       thickness=1,
                       font_scale=0.5,
                       show=True,
@@ -122,21 +131,26 @@ def imshow_det_bboxes(img,
         bboxes = bboxes[inds, :]
         labels = labels[inds]
 
-    bbox_color = color_val(bbox_color)
-    text_color = color_val(text_color)
+    if bbox_color or text_color is None:
+        bbox_color = []
+        text_color = []
+        for c in Color:
+            bbox_color.append(color_val(c))
+            text_color.append(color_val(c))
 
     for bbox, label in zip(bboxes, labels):
         bbox_int = bbox.astype(np.int32)
         left_top = (bbox_int[0], bbox_int[1])
         right_bottom = (bbox_int[2], bbox_int[3])
+        idx = label % len(bbox_color)
         cv2.rectangle(
-            img, left_top, right_bottom, bbox_color, thickness=thickness)
+            img, left_top, right_bottom, bbox_color[idx], thickness=thickness)
         label_text = class_names[
             label] if class_names is not None else f'cls {label}'
         if len(bbox) > 4:
             label_text += f'|{bbox[-1]:.02f}'
         cv2.putText(img, label_text, (bbox_int[0], bbox_int[1] - 2),
-                    cv2.FONT_HERSHEY_COMPLEX, font_scale, text_color)
+                    cv2.FONT_HERSHEY_COMPLEX, font_scale, text_color[idx])
 
     if show:
         imshow(img, win_name, wait_time)
