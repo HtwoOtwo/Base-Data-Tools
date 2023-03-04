@@ -10,10 +10,13 @@ import numpy as np
 if __name__ == "__main__":
     # img = cv2.imread("D:\PythonProject\OpenDataLab-Edu\dataset\cat2.jpg")
     img = r"D:\PythonProject\OpenDataLab-Edu\dataset\cat2.jpg"
-    # data = ImageData(img, size=(256, 256), crop_size=(224, 224))
-    # data = ImageData(img, crop_size=(224,224), size=(256, 256))
+    data = ImageData(img, backbone = "MobileNet")
+    # print(data.value.shape)
     # data.show()
-    imshow_det_bboxes(img, [[56,56,256,256,1],[16,16,156,156,1]],[0,1], ["cat","dog"], 0.5)
+    data = ImageData(img, size=(256, 256), crop_size=(224, 224), normalize=False)
+    data = ImageData(img, crop_size=(224,224), size=(256, 256), normalize=False)
+    data.show()
+    #imshow_det_bboxes(img, [[56,56,256,256,1],[16,16,156,156,1]],[0,1], ["cat","dog"], 0.5)
     # print(data.value.shape)
     # print(data.raw_value.shape)
     # tensor_value = data.to_tensor()

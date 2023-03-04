@@ -42,10 +42,12 @@ class ImageData(object):
         else:
             return None
 
-    def __init__(self, data_source,**kwargs):
+    def __init__(self, data_source, **kwargs):
         self.vct = None
         self.data_source = data_source
+        # 装在默认参数进入私有变量列表
         self.__dict__.update(self._defaults)
+        # 将关键词参数装入私有变量列表
         for name, value in kwargs.items():
             setattr(self, name, value)
 
@@ -62,13 +64,14 @@ class ImageData(object):
             # for key, value in self._backbone_args[self.get_attribute("backbone")].items():
             #     print(key,value)
             self.value = ImageData(data_source, **self._backbone_args[self.get_attribute("backbone")]).value
+            self.__dict__.update(self._backbone_args[self.get_attribute("backbone")])#更新私有变量列表
         else:
-            if self.get_attribute("to_rgb") == False:
+            if self.get_attribute("to_rgb") == False and len(self.value.shape)>=3:
                 self._rgb2gray()
-            else:
+            elif self.get_attribute("to_rgb") == True:
                 self._to3channel()
-            #需要考虑各种操作顺序的灵活性，循环遍历参数列表来实现
-            for key in kwargs.keys():
+            #需要考虑各种操作顺序的灵活性，循环遍历私有变量列表来实现
+            for key in self.__dict__.keys():
                 if key == "size" or key == "size_keep_ratio":
                     size = self.get_attribute("size")
                     size_keep_ratio = self.get_attribute("size_keep_ratio")
