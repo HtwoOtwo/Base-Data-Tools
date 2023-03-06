@@ -86,9 +86,6 @@ class DataSet(object):
         print("图片已复制成功")
 
 
-    def check(self):
-        pass
-
     def print_folder_structure(self, root_folder, indent=''):
         # 遍历文件夹内的所有文件和文件夹
         file_count = 0
@@ -145,7 +142,7 @@ class DataSet(object):
                     raise ValueError("Subdirectory {} has fewer than {} image files".format(subdir, num_files))
         print("Dataset is in ImageNet format")
 
-    def check(self, dataset_path = None):
+    def check_det(self, dataset_path = None):
         if dataset_path == None: dataset_path = self.dataset_path
         if not os.path.exists(os.path.join(dataset_path, 'annotations')):
             raise ValueError('Annotations folder does not exist')
@@ -243,23 +240,95 @@ class DataSet(object):
         return xml_files
 
 
-    def convert(self, source, format = "innolab", train_ratio = 0.7, test_ratio = 0.1, val_ratio = 0.2):
-        '''
-        两种转换格式:
-        1. innolab格式
-        2. 标准CoCo格式
-        '''
+    def make_dataset(self, source, src_format = "innolab", train_ratio = 0.7, test_ratio = 0.1, val_ratio = 0.2):
         input_dir = source
         output_dir = self.dataset_path
 
-        if format.upper() == "INNOLAB":
+        if src_format.upper() == "INNOLAB":
             self.innolab2coco(input_dir, output_dir)
-        elif format.upper() == "COCO":
+        elif src_format.upper() == "COCO":
             self.coco2coco(input_dir, output_dir, train_ratio, test_ratio, val_ratio)
-        elif format.upper() == "VOC":
+        elif src_format.upper() == "VOC":
             self.voc2coco(input_dir, output_dir, train_ratio, test_ratio, val_ratio)
+        elif src_format.upper() == "IMAGENET":
+            self.split_dataset(input_dir, output_dir, train_ratio, test_ratio, val_ratio)
         else:
             pass
+
+    def split_dataset(self, input_dir, output_dir, train_ratio, test_ratio, val_ratio):
+        try:
+            self._check(input_dir)
+        except ValueError as e:
+            # ignore ValueError with specific message
+            if str(e) == "no annotations":
+                pass
+            else:
+                print(e)
+                print("文件夹结构不正确或子文件夹命名错误，正确的文件夹结构为：")
+                print("|---images\n\t|----xxx.jpg/xxx.png/....\n|---classes.txt")
+                return
+        # 清空原文件夹
+        if os.path.exists(output_dir):
+            shutil.rmtree(output_dir)
+        os.makedirs(output_dir)
+        # 构建数据集文件夹结构
+        train_dir = os.path.join(output_dir, "training_set")
+        val_dir = os.path.join(output_dir, "val_set")
+        test_dir = os.path.join(output_dir, "test_set")
+        for dir in [train_dir, val_dir, test_dir]:
+            if not os.path.exists(dir):
+                os.makedirs(dir)
+            for subdir in os.listdir(os.path.join(input_dir, "images")):
+                subdir_path = os.path.join(dir, subdir)
+                if not os.path.exists(subdir_path):
+                    os.makedirs(subdir_path)
+
+        # 读取类别信息文件
+        classes_path = os.path.join(input_dir, "classes.txt")
+        with open(classes_path, "r") as f:
+            classes = f.read().splitlines()
+
+        # 将每个类别与一个唯一的整数标签对应起来
+        class_to_label = {classes[i]: i for i in range(len(classes))}
+
+        # 遍历每个子文件夹
+        print("正在划分数据集，比例为 train:test:val = {}:{}:{}".format(train_ratio, test_ratio, val_ratio))
+        print("转换中......")
+        for subdir in os.listdir(os.path.join(input_dir, "images")):
+            subdir_path = os.path.join(input_dir, "images", subdir)
+            file_list = os.listdir(subdir_path)
+            num_files = len(file_list)
+            random.shuffle(file_list)  # 打乱文件列表顺序
+
+            # 计算划分后每个集合的文件数目
+            num_train_files = int(num_files * train_ratio)
+            num_val_files = int(num_files * val_ratio)
+            num_test_files = num_files - num_train_files - num_val_files
+
+            # 划分数据集并拷贝到对应文件夹中
+            for i, file in enumerate(file_list):
+                file_path = os.path.join(subdir_path, file)
+                if i < num_train_files:
+                    dst_dir = os.path.join(train_dir, subdir)
+                elif i < num_train_files + num_val_files:
+                    dst_dir = os.path.join(val_dir, subdir)
+                else:
+                    dst_dir = os.path.join(test_dir, subdir)
+                shutil.copy(file_path, dst_dir)
+
+        # 生成train.txt, val.txt, test.txt文件
+        for split in [("train", "training_set"), ("val","val_set"), ("test","test_set")]:
+            with open(os.path.join(output_dir, split[0] + ".txt"), "w") as f:
+                for subdir in os.listdir(os.path.join(output_dir, split[1])):
+                    subdir_path = os.path.join(output_dir, split[1], subdir)
+                    for file in os.listdir(subdir_path):
+                        file_path = os.path.join(subdir_path, file)
+                        class_name = subdir
+                        label = class_to_label[class_name]
+                        f.write(file_path + " " + str(label) + "\n")
+        shutil.copy(classes_path, output_dir)
+        print("转换成功")
+
 
     def innolab2coco(self, input_dir, output_dir):
         load_path = input_dir
@@ -366,120 +435,132 @@ class DataSet(object):
         self.copy_images(src_path, img_path)
 
     def coco2coco(self, input_dir, output_dir, train_ratio, test_ratio, val_ratio):
-        if not self._check(input_dir):
-            print("文件夹结构不正确或子文件夹命名错误")
-        else:
-            annotations_path = os.path.join(input_dir, "annotations")
-            images_path = os.path.join(input_dir, "images")
-            classes_path = os.path.join(input_dir, "classes.txt")
-            # 合并json
-            ann_json = self._merge_json(annotations_path)
-            # 划分数据集images和json
-            print("正在划分数据集，比例为 train:test:val = {}:{}:{}".format(train_ratio, test_ratio, val_ratio))
-            train_files, test_files, val_files = self._split_dataset(images_path, train_ratio, test_ratio, val_ratio)
-            train_ann, test_ann, val_ann = self._split_json(ann_json, train_files, test_files, val_files)
-            files = [train_files, test_files, val_files]
-            print("转换中......")
-            # 写入数据
-            if os.path.exists(output_dir):
-                shutil.rmtree(output_dir)
-            os.makedirs(output_dir)
-            for i, sub_path in enumerate(["train", "test", "val"]):
-                folder_path = os.path.join(output_dir, "images" , sub_path)
-                os.makedirs(folder_path, exist_ok=True)
-                for file_name in files[i]:
-                    file_path = os.path.join(images_path,file_name)
-                    dst_path = os.path.join(folder_path, file_name)
-                    shutil.copy(file_path, dst_path)
-            os.makedirs(os.path.join(output_dir, "annotations"), exist_ok=True)
-            with open(os.path.join(os.path.join(output_dir, "annotations"), "train.json"), "w") as f:
-                json.dump(train_ann, f)
-            with open(os.path.join(os.path.join(output_dir, "annotations"), "test.json"), "w") as f:
-                json.dump(test_ann, f)
-            with open(os.path.join(os.path.join(output_dir, "annotations"), "val.json"), "w") as f:
-                json.dump(val_ann, f)
-            shutil.copy(classes_path, output_dir)
-            print("转换成功")
+        try:
+            self._check(input_dir)
+        except Exception as e:
+            print(e)
+            print("文件夹结构不正确或子文件夹命名错误，正确的文件夹结构为：")
+            print("|---annotations\n\t|----xxx.json/xxx.xml/xxx.txt\n|---images\n\t|----xxx.jpg/xxx.png/....\n|---classes.txt")
+            return
+
+        annotations_path = os.path.join(input_dir, "annotations")
+        images_path = os.path.join(input_dir, "images")
+        classes_path = os.path.join(input_dir, "classes.txt")
+        # 合并json
+        ann_json = self._merge_json(annotations_path)
+        # 划分数据集images和json
+        print("正在划分数据集，比例为 train:test:val = {}:{}:{}".format(train_ratio, test_ratio, val_ratio))
+        train_files, test_files, val_files = self._split_dataset(images_path, train_ratio, test_ratio, val_ratio)
+        train_ann, test_ann, val_ann = self._split_json(ann_json, train_files, test_files, val_files)
+        files = [train_files, test_files, val_files]
+        print("转换中......")
+        # 写入数据
+        if os.path.exists(output_dir):
+            shutil.rmtree(output_dir)
+        os.makedirs(output_dir)
+        for i, sub_path in enumerate(["train", "test", "val"]):
+            folder_path = os.path.join(output_dir, "images" , sub_path)
+            os.makedirs(folder_path, exist_ok=True)
+            for file_name in files[i]:
+                file_path = os.path.join(images_path,file_name)
+                dst_path = os.path.join(folder_path, file_name)
+                shutil.copy(file_path, dst_path)
+        os.makedirs(os.path.join(output_dir, "annotations"), exist_ok=True)
+        with open(os.path.join(os.path.join(output_dir, "annotations"), "train.json"), "w") as f:
+            json.dump(train_ann, f)
+        with open(os.path.join(os.path.join(output_dir, "annotations"), "test.json"), "w") as f:
+            json.dump(test_ann, f)
+        with open(os.path.join(os.path.join(output_dir, "annotations"), "val.json"), "w") as f:
+            json.dump(val_ann, f)
+        shutil.copy(classes_path, output_dir)
+        print("转换成功")
+
 
 
     def voc2coco(self, input_dir, output_dir, train_ratio, test_ratio, val_ratio):
-        if not self._check(input_dir):
-            print("文件夹结构不正确或子文件夹命名错误")
-        else:
-            categories = []
-            category_id = 0
-            with open(os.path.join(input_dir, "classes.txt"), "r") as f:
-                for line in f.readlines():
-                    category_name = line.strip()
-                    if category_name:
-                        categories.append({
-                            "id": category_id,
-                            "name": category_name,
-                            "supercategory": category_name
-                        })
-                        category_id += 1
-            coco_annotation = {
-                "categories": categories,
-                "images": [],
-                "annotations": []
-            }
+        try:
+            self._check(input_dir)
+        except Exception as e:
+            print(e)
+            print("文件夹结构不正确或子文件夹命名错误，正确的文件夹结构为：")
+            print("|---annotations\n\t|----xxx.json/xxx.xml/xxx.txt\n|---images\n\t|----xxx.jpg/xxx.png/....\n|---classes.txt")
+            return
 
-            # Read VOC annotations and create COCO annotations
-            annotation_id = 0
-            image_id = 0
-            for image_filename in os.listdir(os.path.join(input_dir, "annotations")):
-                # Read VOC annotation
-                tree = ET.parse(os.path.join(input_dir, "annotations", image_filename))
-                root = tree.getroot()
-                image_filename = image_filename.replace(".xml", ".jpg")
-                image_width = int(root.find("size/width").text)
-                image_height = int(root.find("size/height").text)
+        categories = []
+        category_id = 0
+        with open(os.path.join(input_dir, "classes.txt"), "r") as f:
+            for line in f.readlines():
+                category_name = line.strip()
+                if category_name:
+                    categories.append({
+                        "id": category_id,
+                        "name": category_name,
+                        "supercategory": category_name
+                    })
+                    category_id += 1
+        coco_annotation = {
+            "categories": categories,
+            "images": [],
+            "annotations": []
+        }
 
-                # Create COCO annotation for each object in the image
-                for obj in root.findall("object"):
-                    bbox = obj.find("bndbox")
-                    category_name = obj.find("name").text
-                    category_id = None
-                    for category in categories:
-                        if category_name == category["name"]:
-                            category_id = category["id"]
-                            break
+        # Read VOC annotations and create COCO annotations
+        annotation_id = 0
+        image_id = 0
+        for image_filename in os.listdir(os.path.join(input_dir, "annotations")):
+            # Read VOC annotation
+            tree = ET.parse(os.path.join(input_dir, "annotations", image_filename))
+            root = tree.getroot()
+            image_filename = image_filename.replace(".xml", ".jpg")
+            image_width = int(root.find("size/width").text)
+            image_height = int(root.find("size/height").text)
 
-                    if category_id is None:
-                        continue
+            # Create COCO annotation for each object in the image
+            for obj in root.findall("object"):
+                bbox = obj.find("bndbox")
+                category_name = obj.find("name").text
+                category_id = None
+                for category in categories:
+                    if category_name == category["name"]:
+                        category_id = category["id"]
+                        break
 
-                    xmin = float(bbox.find("xmin").text)
-                    ymin = float(bbox.find("ymin").text)
-                    xmax = float(bbox.find("xmax").text)
-                    ymax = float(bbox.find("ymax").text)
+                if category_id is None:
+                    continue
 
-                    # Create COCO annotation
-                    annotation = {
-                        "id": annotation_id,
-                        "image_id": image_id,
-                        "category_id": category_id,
-                        "bbox": [xmin, ymin, xmax - xmin, ymax - ymin],
-                        "area": (xmax - xmin) * (ymax - ymin),
-                        "iscrowd": 0
-                    }
-                    coco_annotation["annotations"].append(annotation)
-                    annotation_id += 1
+                xmin = float(bbox.find("xmin").text)
+                ymin = float(bbox.find("ymin").text)
+                xmax = float(bbox.find("xmax").text)
+                ymax = float(bbox.find("ymax").text)
 
-                # Create COCO image
-                coco_annotation["images"].append({
-                    "id": image_id,
-                    "file_name": image_filename,
-                    "width": image_width,
-                    "height": image_height
-                })
-                image_id += 1
+                # Create COCO annotation
+                annotation = {
+                    "id": annotation_id,
+                    "image_id": image_id,
+                    "category_id": category_id,
+                    "bbox": [xmin, ymin, xmax - xmin, ymax - ymin],
+                    "area": (xmax - xmin) * (ymax - ymin),
+                    "iscrowd": 0
+                }
+                coco_annotation["annotations"].append(annotation)
+                annotation_id += 1
 
-            # Save COCO annotation file
-            with open(os.path.join(input_dir, "annotations", "annotations.json"), "w") as f:
-                json.dump(coco_annotation, f)
+            # Create COCO image
+            coco_annotation["images"].append({
+                "id": image_id,
+                "file_name": image_filename,
+                "width": image_width,
+                "height": image_height
+            })
+            image_id += 1
 
-            self.coco2coco(input_dir, output_dir, train_ratio, test_ratio, val_ratio)
-            os.remove(os.path.join(input_dir, "annotations", "annotations.json"))
+        # Save COCO annotation file
+        with open(os.path.join(input_dir, "annotations", "annotations.json"), "w") as f:
+            json.dump(coco_annotation, f)
+
+        self.coco2coco(input_dir, output_dir, train_ratio, test_ratio, val_ratio)
+        os.remove(os.path.join(input_dir, "annotations", "annotations.json"))
+
 
     def move_files(self, input_dir, output_dir, suffix):
         for root, dirs, files in os.walk(input_dir):
@@ -611,29 +692,30 @@ class DataSet(object):
         return train_json, test_json, val_json
 
     def _check(self, folder_path):
-        # 检查annotations文件夹和其中的注释文件
-        annotations_path = os.path.join(folder_path, "annotations")
-        if not os.path.exists(annotations_path):
-            return False
-        # annotation_files = os.listdir(annotations_path)
-        # for file_name in annotation_files:
-        #     if not (file_name.endswith(".json") or file_name.endswith(".xml") or file_name.endswith(".txt")):
-        #         return False
+        # 检查classes.txt文件是否存在
+        classes_path = os.path.join(folder_path, "classes.txt")
+        if not os.path.exists(classes_path):
+            raise ValueError("no classes.txt")
+
         # 检查images文件夹和其中的图像文件
         images_path = os.path.join(folder_path, "images")
         if not os.path.exists(images_path):
-            return False
+            raise ValueError("no images")
         # image_files = os.listdir(images_path)
         # for file_name in image_files:
         #     if not (file_name.endswith(".jpg") or file_name.endswith(".png")):
         #         return False
 
-        # 检查classes.txt文件是否存在
-        classes_path = os.path.join(folder_path, "classes.txt")
-        if not os.path.exists(classes_path):
-            return False
-        # 如果所有检查都通过，则返回True
-        return True
+        # 检查annotations文件夹和其中的注释文件
+        annotations_path = os.path.join(folder_path, "annotations")
+        if not os.path.exists(annotations_path):
+            raise ValueError("no annotations")
+        # annotation_files = os.listdir(annotations_path)
+        # for file_name in annotation_files:
+        #     if not (file_name.endswith(".json") or file_name.endswith(".xml") or file_name.endswith(".txt")):
+        #         return False
+
+
 
 if __name__ == "__main__":
     # Example usage
@@ -646,7 +728,7 @@ if __name__ == "__main__":
     # # ds.print_folder_structure(dataset_dir)
 
     ds = DataSet(r"C:\Users\76572\Desktop\my_dataset")
-    ds.convert(r"C:\Users\76572\Desktop\Rabbits_voc", format="voc")
+    ds.make_dataset(r"C:\Users\76572\Desktop\Rabbits_coco", src_format="coco")
     #ds.move_files(r"C:\Users\76572\Desktop\Rabbits_voc\train", r"C:\Users\76572\Desktop\Rabbits_voc\annotations", '.xml')
     # ds.check()
     #ds.convert_data_to_coco_format(r"C:\Users\76572\Desktop\AILab\xedu\dataset\det\cats_and_dogs")
