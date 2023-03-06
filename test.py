@@ -1,4 +1,5 @@
 from BaseDT.data import ImageData, TextData
+from BaseDT.dataset import DataSet
 from BaseDT.io import *
 import matplotlib.pyplot as plt
 from BaseDT.plot import imshow_det_bboxes
@@ -28,6 +29,13 @@ if __name__ == "__main__":
     # mic = MicroPhone()
     # plt.plot(mic.record_audio())
     # plt.show()
+    ds = DataSet(r"C:\Users\76572\Desktop\my_dataset")
+    ds.make_dataset(r"C:\Users\76572\Desktop\Rabbits_coco", src_format="coco")
+    # ds.move_files(r"C:\Users\76572\Desktop\Rabbits_voc\train", r"C:\Users\76572\Desktop\Rabbits_voc\annotations", '.xml')
+    # ds.check()
+    # ds.convert_data_to_coco_format(r"C:\Users\76572\Desktop\AILab\xedu\dataset\det\cats_and_dogs")
+    # ds.rename_files_in_coco(r"D:\PythonProject\OpenMMLab-Edu-main\dataset\det\Rabbits\annotations\valid.json", r"D:\PythonProject\OpenMMLab-Edu-main\dataset\det\Rabbits\images\val_set")
+
 
 
 
