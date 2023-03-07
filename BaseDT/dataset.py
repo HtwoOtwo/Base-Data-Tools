@@ -265,7 +265,7 @@ class DataSet(object):
             else:
                 print(e)
                 print("文件夹结构不正确或子文件夹命名错误，正确的文件夹结构为：")
-                print("|---images\n\t|----xxx.jpg/xxx.png/....\n|---classes.txt")
+                print("|---images\n\t|----class1\n\t\t|----xxx.jpg/xxx.png/....\n\t|----classN\n\t\t|----xxx.jpg/xxx.png/....\n|---classes.txt")
                 return
         # 清空原文件夹
         if os.path.exists(output_dir):
@@ -317,7 +317,7 @@ class DataSet(object):
                 shutil.copy(file_path, dst_dir)
 
         # 生成train.txt, val.txt, test.txt文件
-        for split in [("train", "training_set"), ("val","val_set"), ("test","test_set")]:
+        for split in [("val","val_set"), ("test","test_set")]:
             with open(os.path.join(output_dir, split[0] + ".txt"), "w") as f:
                 for subdir in os.listdir(os.path.join(output_dir, split[1])):
                     subdir_path = os.path.join(output_dir, split[1], subdir)
@@ -458,7 +458,7 @@ class DataSet(object):
         if os.path.exists(output_dir):
             shutil.rmtree(output_dir)
         os.makedirs(output_dir)
-        for i, sub_path in enumerate(["train", "test", "val"]):
+        for i, sub_path in enumerate(["train", "test", "valid"]):
             folder_path = os.path.join(output_dir, "images" , sub_path)
             os.makedirs(folder_path, exist_ok=True)
             for file_name in files[i]:
@@ -470,7 +470,7 @@ class DataSet(object):
             json.dump(train_ann, f)
         with open(os.path.join(os.path.join(output_dir, "annotations"), "test.json"), "w") as f:
             json.dump(test_ann, f)
-        with open(os.path.join(os.path.join(output_dir, "annotations"), "val.json"), "w") as f:
+        with open(os.path.join(os.path.join(output_dir, "annotations"), "valid.json"), "w") as f:
             json.dump(val_ann, f)
         shutil.copy(classes_path, output_dir)
         print("转换成功")
@@ -728,7 +728,7 @@ if __name__ == "__main__":
     # # ds.print_folder_structure(dataset_dir)
 
     ds = DataSet(r"C:\Users\76572\Desktop\my_dataset")
-    ds.make_dataset(r"C:\Users\76572\Desktop\Rabbits_coco", src_format="coco")
+    ds.make_dataset(r"C:\Users\76572\Desktop\Rabbits_voc", src_format="voc")
     #ds.move_files(r"C:\Users\76572\Desktop\Rabbits_voc\train", r"C:\Users\76572\Desktop\Rabbits_voc\annotations", '.xml')
     # ds.check()
     #ds.convert_data_to_coco_format(r"C:\Users\76572\Desktop\AILab\xedu\dataset\det\cats_and_dogs")
