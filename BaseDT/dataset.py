@@ -19,7 +19,8 @@ class DataSet(object):
         if dataset_path is None: self.dataset_path = os.getcwd()
         else: self.dataset_path = dataset_path
         if not os.path.exists(self.dataset_path):
-            raise ValueError("请先创建相应数据集文件夹")
+            #print("数据集文件夹不存在，已为您创建")
+            os.makedirs(dataset_path)
 
     def download(self, dataset_name):
         username = "luyanan@pjlab.org.cn"
@@ -245,7 +246,7 @@ class DataSet(object):
         output_dir = self.dataset_path
 
         if src_format.upper() == "INNOLAB":
-            self.innolab2coco(input_dir, output_dir)
+            self.innolab2coco(input_dir, output_dir, train_ratio, test_ratio, val_ratio)
         elif src_format.upper() == "COCO":
             self.coco2coco(input_dir, output_dir, train_ratio, test_ratio, val_ratio)
         elif src_format.upper() == "VOC":
@@ -330,134 +331,94 @@ class DataSet(object):
         print("转换成功")
 
 
-    def innolab2coco(self, input_dir, output_dir):
-        load_path = input_dir
-        ann_path = os.path.join(output_dir, 'annotations')
-        if os.path.exists(ann_path):
-            shutil.rmtree(ann_path)
-        os.makedirs(ann_path)
-        save_file1 = os.path.join(ann_path, 'train.json')
-        save_file2 = os.path.join(ann_path, 'valid.json')
-        save_txt = os.path.join(output_dir, 'classes.txt')
-
-        if os.path.exists(save_file1):
-            os.remove(save_file1)
+    def innolab2coco(self, input_dir, output_dir, train_ratio, test_ratio, val_ratio):
+        '''
+        由于读写权限，classes信息直接传入coco2coco
+        '''
+        classes = []
 
         labels_json = os.path.join(input_dir, 'labels.json')
         used_labels_json = os.path.join(input_dir, 'used_labels.json')
 
-        train_out = {"images": [], "type": "instances", "annotations": [], "categories": []}
-        val_out = {"images": [], "type": "instances", "annotations": [], "categories": []}
+        ann_out = {"images": [], "type": "instances", "annotations": [], "categories": []}
         cid = {}
-        if os.path.exists(save_txt):
-            os.remove(save_txt)
-        save = open(save_txt, "w")  # save = open(save_txt, "a")
 
         files = self.read_json(labels_json)
         for id, c in enumerate(files):
-            train_out["categories"].append({"supercategory": "None", "id": id, "name": c["name"]})
-            val_out["categories"].append({"supercategory": "None", "id": id, "name": c["name"]})
+            ann_out["categories"].append({"supercategory": "None", "id": id, "name": c["name"]})
             cid[c["id"]] = id
-            save.write(c["name"] + "\n")
-        save.close()
+            classes.append(c["name"])
 
         annotation_train_id = 0
         img_train_id = 0
-        annotation_val_id = 0
-        img_val_id = 0
-        test_num = 0
 
         files = self.read_json(used_labels_json)
         for id, f in enumerate(files):
-            if f['filePath'].count('train') == 0 and f['filePath'].count('test') == 0:
+            p = input_dir + f['filePath'].split('.')[0] + '.json'
+            if not os.path.exists(p):
+                #print("路径：" + p + " json标注文件不存在，已跳过该对应路径标注文件")
                 continue
+            single = self.read_json(p)
 
-            if f['filePath'].count('train') != 0 and len(f['datalabelIds']) > 0:
-                p = load_path + f['filePath'].split('.')[0] + '.json'
-                if not os.path.exists(p):
-                    print("路径：" + p + " json标注文件不存在，已跳过该对应路径标注文件")
-                    continue
-                single = self.read_json(p)
+            s1 = json.loads(single['rectTool'])['step_1']['result']
+            s2 = json.loads(single['rectTool'])
+            num = len(s1)
+            s1 = s1[0]
+            name = f['filePath'].split('/')[-1]
+            ann_out["images"].append(
+                {"file_name": str(name), "height": s2["height"], "width": s2["width"], "id": img_train_id})
+            for i in range(num):
+                s = json.loads(single['rectTool'])['step_1']['result'][i]
+                ann_out["annotations"].append(
+                    {"id": annotation_train_id, "image_id": img_train_id, "ignore": 0,
+                     "category_id": cid[s["attribute"]],
+                     "area": int(s["height"]) * int(s["width"]), "iscrowd": 0,
+                     "bbox": [int(s["x"]), int(s["y"]),
+                              int(s["width"]), int(s["height"])]})
+                annotation_train_id += 1
+            img_train_id += 1
 
-                s1 = json.loads(single['rectTool'])['step_1']['result']
-                s2 = json.loads(single['rectTool'])
-                num = len(s1)
-                s1 = s1[0]
-                name = f['filePath'].split('/')[-1]
-                train_out["images"].append(
-                    {"file_name": str(name), "height": s2["height"], "width": s2["width"], "id": img_train_id})
-                for i in range(num):
-                    s = json.loads(single['rectTool'])['step_1']['result'][i]
-                    train_out["annotations"].append(
-                        {"id": annotation_train_id, "image_id": img_train_id, "ignore": 0,
-                         "category_id": cid[s["attribute"]],
-                         "area": int(s["height"]) * int(s["width"]), "iscrowd": 0,
-                         "bbox": [int(s["x"]), int(s["y"]),
-                                  int(s["width"]), int(s["height"])]})
-                    annotation_train_id += 1
-                img_train_id += 1
+        self.coco2coco(input_dir, output_dir, train_ratio, test_ratio, val_ratio, ann_json=ann_out, classes = classes)
 
-            if f['filePath'].count('test') != 0 and len(f['datalabelIds']) > 0:
-                p = load_path + f['filePath'].split('.')[0] + '.json'
-                if not os.path.exists(p):
-                    print("路径：" + p + " json标注文件不存在，已跳过该对应路径标注文件")
-                    continue
-                single = self.read_json(p)
-                s1 = json.loads(single['rectTool'])['step_1']['result']
-                s2 = json.loads(single['rectTool'])
-                num = len(s1)
-                s1 = s1[0]
-                name = f['filePath'].split('/')[-1]
-                val_out["images"].append(
-                    {"file_name": str(name), "height": s2["height"], "width": s2["width"], "id": img_val_id})
-                for i in range(num):
-                    s = json.loads(single['rectTool'])['step_1']['result'][i]
-                    val_out["annotations"].append({"id": annotation_val_id, "image_id": img_val_id, "ignore": 0,
-                                                   "category_id": cid[s["attribute"]],
-                                                   "area": int(s["height"]) * int(s["width"]), "iscrowd": 0,
-                                                   "bbox": [int(s["x"]), int(s["y"]),
-                                                            int(s["width"]), int(s["height"])]})
-                    annotation_val_id += 1
-                img_val_id += 1
-                test_num += 1
-        self.write_json(train_out, save_file1)
-        self.write_json(val_out, save_file2)
-        print("训练数据格式转换已完成")
-        print("测试数据格式转换已完成")
-        # 拷贝图片
-        img_path = os.path.join(output_dir, "images")
-        if os.path.exists(img_path):
-            shutil.rmtree(img_path)
-        os.makedirs(img_path)
-        contents = os.listdir(input_dir)
-        subdirs = [os.path.join(input_dir, f) for f in contents if os.path.isdir(os.path.join(input_dir, f))]
-        src_path = os.path.join(input_dir, subdirs[0])  # 原数据集中的图片文件
-        self.copy_images(src_path, img_path)
-
-    def coco2coco(self, input_dir, output_dir, train_ratio, test_ratio, val_ratio):
+    def coco2coco(self, input_dir, output_dir, train_ratio, test_ratio, val_ratio, ann_json = None, classes = None):
+        '''
+        coco转XEdu coco
+        '''
         try:
             self._check(input_dir)
         except Exception as e:
-            print(e)
-            print("文件夹结构不正确或子文件夹命名错误，正确的文件夹结构为：")
-            print("|---annotations\n\t|----xxx.json/xxx.xml/xxx.txt\n|---images\n\t|----xxx.jpg/xxx.png/....\n|---classes.txt")
-            return
+            if classes == None:
+                print(e)
+                print("文件夹结构不正确或子文件夹命名错误，正确的文件夹结构为：")
+                print("|---annotations\n\t|----xxx.json/xxx.xml/xxx.txt\n|---images\n\t|----xxx.jpg/xxx.png/....\n|---classes.txt")
+                return
+        # 清理文件夹
+        if os.path.exists(output_dir):
+            shutil.rmtree(output_dir)
+        os.makedirs(output_dir)
 
         annotations_path = os.path.join(input_dir, "annotations")
         images_path = os.path.join(input_dir, "images")
-        classes_path = os.path.join(input_dir, "classes.txt")
+        if os.path.exists(os.path.join(input_dir, "classes.txt")):
+            classes_path = os.path.join(input_dir, "classes.txt")
+            shutil.copy(classes_path, output_dir)
+        elif classes != None:
+            with open(os.path.join(output_dir, "classes.txt"),'w') as f:
+                for class_name in classes:
+                    f.write(class_name+'\n')
+        else:
+            print("请提供类别信息")
         # 合并json
-        ann_json = self._merge_json(annotations_path)
+        if not ann_json:
+            ann_json = self._merge_json(annotations_path)
+
         # 划分数据集images和json
         print("正在划分数据集，比例为 train:test:val = {}:{}:{}".format(train_ratio, test_ratio, val_ratio))
         train_files, test_files, val_files = self._split_dataset(images_path, train_ratio, test_ratio, val_ratio)
         train_ann, test_ann, val_ann = self._split_json(ann_json, train_files, test_files, val_files)
         files = [train_files, test_files, val_files]
         print("转换中......")
-        # 写入数据
-        if os.path.exists(output_dir):
-            shutil.rmtree(output_dir)
-        os.makedirs(output_dir)
+        #写入数据
         for i, sub_path in enumerate(["train", "test", "valid"]):
             folder_path = os.path.join(output_dir, "images" , sub_path)
             os.makedirs(folder_path, exist_ok=True)
@@ -472,12 +433,14 @@ class DataSet(object):
             json.dump(test_ann, f)
         with open(os.path.join(os.path.join(output_dir, "annotations"), "valid.json"), "w") as f:
             json.dump(val_ann, f)
-        shutil.copy(classes_path, output_dir)
         print("转换成功")
 
 
 
     def voc2coco(self, input_dir, output_dir, train_ratio, test_ratio, val_ratio):
+        '''
+        由于读写权限，annotation将直接传入coco2coco
+        '''
         try:
             self._check(input_dir)
         except Exception as e:
@@ -555,11 +518,8 @@ class DataSet(object):
             image_id += 1
 
         # Save COCO annotation file
-        with open(os.path.join(input_dir, "annotations", "annotations.json"), "w") as f:
-            json.dump(coco_annotation, f)
-
-        self.coco2coco(input_dir, output_dir, train_ratio, test_ratio, val_ratio)
-        os.remove(os.path.join(input_dir, "annotations", "annotations.json"))
+        # TODO 注意读写权限
+        self.coco2coco(input_dir, output_dir, train_ratio, test_ratio, val_ratio, ann_json=coco_annotation)
 
 
     def move_files(self, input_dir, output_dir, suffix):
@@ -578,7 +538,7 @@ class DataSet(object):
         根据比例划分数据集
         """
         # 获取数据集中的所有文件名
-        file_names = os.listdir(images_path)
+        file_names = [f for f in os.listdir(images_path) if os.path.splitext(f)[1].upper() in [".JPG",".PNG",".JPEG",".BMP","TIFF"]]
         # 洗牌以随机分配
         random.shuffle(file_names)
 
@@ -691,14 +651,16 @@ class DataSet(object):
 
         return train_json, test_json, val_json
 
-    def _check(self, folder_path):
+    def _check(self, input_dir):
+        if not os.path.exists(input_dir):
+            raise ValueError("{} 路径错误".format(input_dir))
         # 检查classes.txt文件是否存在
-        classes_path = os.path.join(folder_path, "classes.txt")
+        classes_path = os.path.join(input_dir, "classes.txt")
         if not os.path.exists(classes_path):
             raise ValueError("no classes.txt")
 
         # 检查images文件夹和其中的图像文件
-        images_path = os.path.join(folder_path, "images")
+        images_path = os.path.join(input_dir, "images")
         if not os.path.exists(images_path):
             raise ValueError("no images")
         # image_files = os.listdir(images_path)
@@ -707,7 +669,7 @@ class DataSet(object):
         #         return False
 
         # 检查annotations文件夹和其中的注释文件
-        annotations_path = os.path.join(folder_path, "annotations")
+        annotations_path = os.path.join(input_dir, "annotations")
         if not os.path.exists(annotations_path):
             raise ValueError("no annotations")
         # annotation_files = os.listdir(annotations_path)
@@ -728,7 +690,7 @@ if __name__ == "__main__":
     # # ds.print_folder_structure(dataset_dir)
 
     ds = DataSet(r"C:\Users\76572\Desktop\my_dataset")
-    ds.make_dataset(r"C:\Users\76572\Desktop\Rabbits_voc", src_format="voc")
+    ds.make_dataset(r"C:\Users\76572\Desktop\CatDog (2)", src_format="innolab")
     #ds.move_files(r"C:\Users\76572\Desktop\Rabbits_voc\train", r"C:\Users\76572\Desktop\Rabbits_voc\annotations", '.xml')
     # ds.check()
     #ds.convert_data_to_coco_format(r"C:\Users\76572\Desktop\AILab\xedu\dataset\det\cats_and_dogs")
