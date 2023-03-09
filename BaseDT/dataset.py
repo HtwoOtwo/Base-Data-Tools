@@ -323,7 +323,7 @@ class DataSet(object):
                 for subdir in os.listdir(os.path.join(output_dir, split[1])):
                     subdir_path = os.path.join(output_dir, split[1], subdir)
                     for file in os.listdir(subdir_path):
-                        file_path = os.path.join(subdir_path, file)
+                        file_path = subdir + '/' + file
                         class_name = subdir
                         label = class_to_label[class_name]
                         f.write(file_path + " " + str(label) + "\n")
@@ -690,7 +690,7 @@ if __name__ == "__main__":
     # # ds.print_folder_structure(dataset_dir)
 
     ds = DataSet(r"C:\Users\76572\Desktop\my_dataset")
-    ds.make_dataset(r"C:\Users\76572\Desktop\CatDog (2)", src_format="innolab")
+    ds.make_dataset(r"C:\Users\76572\Desktop\AILab\xedu\dataset\cls\imagenet", src_format="imagenet")
     #ds.move_files(r"C:\Users\76572\Desktop\Rabbits_voc\train", r"C:\Users\76572\Desktop\Rabbits_voc\annotations", '.xml')
     # ds.check()
     #ds.convert_data_to_coco_format(r"C:\Users\76572\Desktop\AILab\xedu\dataset\det\cats_and_dogs")
