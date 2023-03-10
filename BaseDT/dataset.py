@@ -110,7 +110,7 @@ class DataSet(object):
                 print(indent + file)
 
 
-    def check_imagenet(self, dataset_path = None):
+    def check_cls(self, dataset_path = None):
         if dataset_path == None: dataset_path = self.dataset_path
         # 检查文件夹是否存在
         if not os.path.exists(dataset_path):
@@ -140,8 +140,8 @@ class DataSet(object):
                 subdir_path = os.path.join(dataset_path, subdir, subsubdir)
                 num_files_in_subdir = len([f for f in os.listdir(subdir_path) if f.endswith(".jpg") or f.endswith(".png")])
                 if num_files_in_subdir < num_files:
-                    raise ValueError("Subdirectory {} has fewer than {} image files".format(subdir, num_files))
-        print("Dataset is in ImageNet format")
+                    print("{} 文件夹图片数量不足 {} 可能会影响训练结果".format(subdir, num_files))
+        print("数据集符合cls标准")
 
     def check_det(self, dataset_path = None):
         if dataset_path == None: dataset_path = self.dataset_path
@@ -181,7 +181,21 @@ class DataSet(object):
                     pass
                 else:
                     raise ValueError('Image does not have a corresponding annotation')
-        print("Dataset is in COCO format")
+
+        # 检查数据量是否足够
+        required_num_files = {
+            "train": 100,
+            "valid": 10,
+            # "test_set": 10
+        }
+        required_subdirs = ["train", "valid", "test"]
+        for subdir, num_files in required_num_files.items():
+            subdir_path = os.path.join(dataset_path, "images", subdir)
+            num_files_in_subdir = len(
+                [f for f in os.listdir(subdir_path) if f.endswith(".jpg") or f.endswith(".png")])
+            if num_files_in_subdir < num_files:
+                print("{} 文件夹图片数量不足 {} 可能会影响训练结果".format(subdir, num_files))
+        print("数据集符合det标准")
 
 
     def rename_files_in_coco(self, annotations_file, images_dir):
@@ -247,14 +261,20 @@ class DataSet(object):
 
         if src_format.upper() == "INNOLAB":
             self.innolab2coco(input_dir, output_dir, train_ratio, test_ratio, val_ratio)
+            self.check_det()
         elif src_format.upper() == "COCO":
             self.coco2coco(input_dir, output_dir, train_ratio, test_ratio, val_ratio)
+            self.check_det()
         elif src_format.upper() == "VOC":
             self.voc2coco(input_dir, output_dir, train_ratio, test_ratio, val_ratio)
+            self.check_det()
         elif src_format.upper() == "IMAGENET":
             self.split_dataset(input_dir, output_dir, train_ratio, test_ratio, val_ratio)
+            self.check_cls()
         else:
-            pass
+            raise ValueError("未支持的数据集格式")
+        self.print_folder_structure(self.dataset_path)
+
 
     def split_dataset(self, input_dir, output_dir, train_ratio, test_ratio, val_ratio):
         try:
@@ -408,8 +428,13 @@ class DataSet(object):
                     f.write(class_name+'\n')
         else:
             print("请提供类别信息")
+
         # 合并json
         if not ann_json:
+            # 检查数据集格式
+            json_files = [f for f in os.listdir(annotations_path) if f.endswith('.json')]
+            if len(json_files) == 0:
+                raise ValueError("没有找到json文件，请确认数据集类型是否正确")
             ann_json = self._merge_json(annotations_path)
 
         # 划分数据集images和json
@@ -448,6 +473,11 @@ class DataSet(object):
             print("文件夹结构不正确或子文件夹命名错误，正确的文件夹结构为：")
             print("|---annotations\n\t|----xxx.json/xxx.xml/xxx.txt\n|---images\n\t|----xxx.jpg/xxx.png/....\n|---classes.txt")
             return
+
+        annotations_path = os.path.join(input_dir, "annotations")
+        xml_files = [f for f in os.listdir(annotations_path) if f.endswith('xml')]
+        if len(xml_files) == 0:
+            raise ValueError("没有找到xml文件，请确认数据集类型是否正确")
 
         categories = []
         category_id = 0
@@ -690,7 +720,7 @@ if __name__ == "__main__":
     # # ds.print_folder_structure(dataset_dir)
 
     ds = DataSet(r"C:\Users\76572\Desktop\my_dataset")
-    ds.make_dataset(r"C:\Users\76572\Desktop\AILab\xedu\dataset\cls\imagenet", src_format="imagenet")
+    ds.make_dataset(r"C:\Users\76572\Desktop\Rabbits_voc", src_format="voc")
     #ds.move_files(r"C:\Users\76572\Desktop\Rabbits_voc\train", r"C:\Users\76572\Desktop\Rabbits_voc\annotations", '.xml')
     # ds.check()
     #ds.convert_data_to_coco_format(r"C:\Users\76572\Desktop\AILab\xedu\dataset\det\cats_and_dogs")
