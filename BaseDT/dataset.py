@@ -15,7 +15,8 @@ class DataSet(object):
         "Middlebury_2001": ["echo Y | odl get Middlebury_2001\n"],
         "Letter": ["echo Y | odl get Letter\n"],
     }
-    def __init__(self, dataset_path = None):
+    def __init__(self, dataset_path = None, dataset_type = None):
+        self.dataset_type = dataset_type
         if dataset_path is None: self.dataset_path = os.getcwd()
         else: self.dataset_path = dataset_path
         if not os.path.exists(self.dataset_path):
@@ -114,20 +115,22 @@ class DataSet(object):
         if dataset_path == None: dataset_path = self.dataset_path
         # 检查文件夹是否存在
         if not os.path.exists(dataset_path):
-            raise ValueError("Dataset directory does not exist")
+            raise ValueError("数据集路径不存在")
 
         if not os.path.exists(os.path.join(dataset_path,"classes.txt")):
-            raise ValueError("Dataset directory is missing required classes.txt")
+            raise ValueError("classes.txt缺失")
+        if not os.path.exists(os.path.join(dataset_path,"val.txt")):
+            raise ValueError("val.txt缺失")
 
         # 检查子文件夹是否存在
-        required_subdirs = ["training_set", "val_set", "test_set"]
+        required_subdirs = ["training_set", "val_set"]
         with open(os.path.join(dataset_path,"classes.txt")) as f:
             required_subsubdirs = [e.rstrip("\n") for e in f.readlines()]
         for subdir in required_subdirs:
             for subsubdir in required_subsubdirs:
                 subdir_path = os.path.join(dataset_path, subdir, subsubdir)
                 if not os.path.exists(subdir_path):
-                    raise ValueError("Dataset directory is missing required subdirectory: {}".format(subdir))
+                    raise ValueError("{}文件夹缺失".format(subsubdir))
 
         # 检查数据量是否足够
         required_num_files = {
@@ -146,13 +149,16 @@ class DataSet(object):
     def check_det(self, dataset_path = None):
         if dataset_path == None: dataset_path = self.dataset_path
         if not os.path.exists(os.path.join(dataset_path, 'annotations')):
-            raise ValueError('Annotations folder does not exist')
+            raise ValueError('Annotations文件夹不存在')
 
         # 检查train和val文件夹是否存在
-        # TODO 这里的test应该是val
-        if not (os.path.exists(os.path.join(dataset_path, 'images/train')) or os.path.exists(
-                os.path.join(dataset_path, 'images/test'))):
-            raise ValueError('train or test folder does not exist')
+        required_subdirs = ["train", "valid"]
+        for subdir in required_subdirs:
+            subdir_path = os.path.join(dataset_path, "images", subdir)
+            if not os.path.exists(subdir_path):
+                raise ValueError("{}文件夹缺失".format(subdir))
+            if not os.path.exists(os.path.join(dataset_path, "annotations", "{}.json".format(subdir))):
+                raise ValueError("{}.json文件缺失".format(subdir))
 
         # Get the paths to the annotation files
         annotation_paths = [os.path.join(dataset_path, 'annotations', file) for file in
@@ -169,7 +175,7 @@ class DataSet(object):
                 #print('Annotation file is in the correct format')
                 pass
             else:
-                raise ValueError('Annotation file is not in the correct format')
+                raise ValueError('json文件格式错误')
 
             images = annotation['images']
 
@@ -180,7 +186,7 @@ class DataSet(object):
                     #print('Image has a corresponding annotation')
                     pass
                 else:
-                    raise ValueError('Image does not have a corresponding annotation')
+                    raise ValueError('图片未正确标注')
 
         # 检查数据量是否足够
         required_num_files = {
@@ -258,22 +264,25 @@ class DataSet(object):
     def make_dataset(self, source, src_format = "innolab", train_ratio = 0.7, test_ratio = 0.1, val_ratio = 0.2):
         input_dir = source
         output_dir = self.dataset_path
+        try:
+            if src_format.upper() == "INNOLAB":
+                self.innolab2coco(input_dir, output_dir, train_ratio, test_ratio, val_ratio)
+                self.check_det()
+            elif src_format.upper() == "COCO":
+                self.coco2coco(input_dir, output_dir, train_ratio, test_ratio, val_ratio)
+                self.check_det()
+            elif src_format.upper() == "VOC":
+                self.voc2coco(input_dir, output_dir, train_ratio, test_ratio, val_ratio)
+                self.check_det()
+            elif src_format.upper() == "IMAGENET":
+                self.split_dataset(input_dir, output_dir, train_ratio, test_ratio, val_ratio)
+                self.check_cls()
+            else:
+                raise ValueError("未支持的数据集格式")
+            self.print_folder_structure(self.dataset_path)
+        except Exception as e:
+            raise e
 
-        if src_format.upper() == "INNOLAB":
-            self.innolab2coco(input_dir, output_dir, train_ratio, test_ratio, val_ratio)
-            self.check_det()
-        elif src_format.upper() == "COCO":
-            self.coco2coco(input_dir, output_dir, train_ratio, test_ratio, val_ratio)
-            self.check_det()
-        elif src_format.upper() == "VOC":
-            self.voc2coco(input_dir, output_dir, train_ratio, test_ratio, val_ratio)
-            self.check_det()
-        elif src_format.upper() == "IMAGENET":
-            self.split_dataset(input_dir, output_dir, train_ratio, test_ratio, val_ratio)
-            self.check_cls()
-        else:
-            raise ValueError("未支持的数据集格式")
-        self.print_folder_structure(self.dataset_path)
 
 
     def split_dataset(self, input_dir, output_dir, train_ratio, test_ratio, val_ratio):
@@ -404,14 +413,15 @@ class DataSet(object):
         '''
         coco转XEdu coco
         '''
-        try:
-            self._check(input_dir)
-        except Exception as e:
-            if classes == None:
-                print(e)
-                print("文件夹结构不正确或子文件夹命名错误，正确的文件夹结构为：")
-                print("|---annotations\n\t|----xxx.json/xxx.xml/xxx.txt\n|---images\n\t|----xxx.jpg/xxx.png/....\n|---classes.txt")
-                return
+        if ann_json == None:
+            try:
+                self._check(input_dir)
+            except Exception as e:
+                if classes == None:
+                    print(e)
+                    print("文件夹结构不正确或子文件夹命名错误，正确的文件夹结构为：")
+                    print("|---annotations\n\t|----xxx.json/xxx.xml/xxx.txt\n|---images\n\t|----xxx.jpg/xxx.png/....\n|---classes.txt")
+                raise e
         # 清理文件夹
         if os.path.exists(output_dir):
             shutil.rmtree(output_dir)
@@ -472,7 +482,7 @@ class DataSet(object):
             print(e)
             print("文件夹结构不正确或子文件夹命名错误，正确的文件夹结构为：")
             print("|---annotations\n\t|----xxx.json/xxx.xml/xxx.txt\n|---images\n\t|----xxx.jpg/xxx.png/....\n|---classes.txt")
-            return
+            raise e
 
         annotations_path = os.path.join(input_dir, "annotations")
         xml_files = [f for f in os.listdir(annotations_path) if f.endswith('xml')]
@@ -548,7 +558,6 @@ class DataSet(object):
             image_id += 1
 
         # Save COCO annotation file
-        # TODO 注意读写权限
         self.coco2coco(input_dir, output_dir, train_ratio, test_ratio, val_ratio, ann_json=coco_annotation)
 
 
@@ -707,6 +716,32 @@ class DataSet(object):
         #     if not (file_name.endswith(".json") or file_name.endswith(".xml") or file_name.endswith(".txt")):
         #         return False
 
+    def check(self, dataset_path = None):
+        if self.dataset_type == None:
+            try:
+                try:
+                    self.check_det(dataset_path)
+                    self.print_folder_structure(self.dataset_path)
+                except:
+                    self.check_cls(dataset_path)
+                    self.print_folder_structure(self.dataset_path)
+            except:
+                print("数据集既不符合det也不符合cls")
+        elif self.dataset_type == "det":
+            try:
+                self.check_det()
+                self.print_folder_structure(self.dataset_path)
+            except Exception as e:
+                print(e)
+        elif self.dataset_type == "cls":
+            try:
+                self.check_cls()
+                self.print_folder_structure(self.dataset_path)
+            except Exception as e:
+                print(e)
+
+
+
 
 
 if __name__ == "__main__":
@@ -720,12 +755,10 @@ if __name__ == "__main__":
     # # ds.print_folder_structure(dataset_dir)
 
     ds = DataSet(r"C:\Users\76572\Desktop\my_dataset")
-    ds.make_dataset(r"C:\Users\76572\Desktop\Rabbits_voc", src_format="voc")
+    ds.make_dataset(r"C:\Users\76572\Desktop\CatDog (2)", src_format="innolab")
+    #ds.make_dataset(r"C:\Users\76572\Desktop\AILab\xedu\dataset\cls\imagenet", src_format="imagenet")
+    #
+    #ds.check()
     #ds.move_files(r"C:\Users\76572\Desktop\Rabbits_voc\train", r"C:\Users\76572\Desktop\Rabbits_voc\annotations", '.xml')
     # ds.check()
-    #ds.convert_data_to_coco_format(r"C:\Users\76572\Desktop\AILab\xedu\dataset\det\cats_and_dogs")
-    #ds.rename_files_in_coco(r"D:\PythonProject\OpenMMLab-Edu-main\dataset\det\Rabbits\annotations\valid.json", r"D:\PythonProject\OpenMMLab-Edu-main\dataset\det\Rabbits\images\val_set")
-
-
-
 
