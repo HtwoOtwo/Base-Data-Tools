@@ -150,6 +150,8 @@ class DataSet(object):
         if dataset_path == None: dataset_path = self.dataset_path
         if not os.path.exists(os.path.join(dataset_path, 'annotations')):
             raise ValueError('Annotations文件夹不存在')
+        if not os.path.exists(os.path.join(dataset_path, 'classes.txt')):
+            raise ValueError('classes.txt文件夹不存在')
 
         # 检查train和val文件夹是否存在
         required_subdirs = ["train", "valid"]
@@ -179,14 +181,14 @@ class DataSet(object):
 
             images = annotation['images']
 
-            # 检查图片
-            for image in images:
-                # 检查图片是否有标注
-                if 'id' in image and any(ann['image_id'] == image['id'] for ann in annotation['annotations']):
-                    #print('Image has a corresponding annotation')
-                    pass
-                else:
-                    raise ValueError('图片未正确标注')
+            # # 检查图片
+            # for image in images:
+            #     # 检查图片是否有标注
+            #     if 'id' in image and any(ann['image_id'] == image['id'] for ann in annotation['annotations']):
+            #         #print('Image has a corresponding annotation')
+            #         pass
+            #     else:
+            #         raise ValueError('图片未正确标注')
 
         # 检查数据量是否足够
         required_num_files = {

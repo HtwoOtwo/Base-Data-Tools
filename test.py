@@ -10,13 +10,13 @@ import numpy as np
 
 if __name__ == "__main__":
     # img = cv2.imread("D:\PythonProject\OpenDataLab-Edu\dataset\cat2.jpg")
-    img = r"D:\PythonProject\OpenDataLab-Edu\dataset\cat2.jpg"
-    data = ImageData(img, backbone = "MobileNet")
-    # print(data.value.shape)
+    # img = r"D:\PythonProject\OpenDataLab-Edu\dataset\cat2.jpg"
+    # data = ImageData(img, backbone = "MobileNet")
+    # # print(data.value.shape)
+    # # data.show()
+    # data = ImageData(img, size=(256, 256), crop_size=(224, 224), normalize=False)
+    # data = ImageData(img, crop_size=(224,224), size=(256, 256), normalize=False)
     # data.show()
-    data = ImageData(img, size=(256, 256), crop_size=(224, 224), normalize=False)
-    data = ImageData(img, crop_size=(224,224), size=(256, 256), normalize=False)
-    data.show()
     #imshow_det_bboxes(img, [[56,56,256,256,1],[16,16,156,156,1]],[0,1], ["cat","dog"], 0.5)
     # print(data.value.shape)
     # print(data.raw_value.shape)
@@ -29,8 +29,8 @@ if __name__ == "__main__":
     # mic = MicroPhone()
     # plt.plot(mic.record_audio())
     # plt.show()
-    ds = DataSet(r"C:\Users\76572\Desktop\my_dataset")
-    ds.make_dataset(r"C:\Users\76572\Desktop\Rabbits_coco", src_format="coco")
+    ds = DataSet(r"C:\Users\76572\Desktop\my_dataset", "det")
+    ds.make_dataset(r"C:\Users\76572\Desktop\Rabbits_voc", src_format="voc")
     # ds.move_files(r"C:\Users\76572\Desktop\Rabbits_voc\train", r"C:\Users\76572\Desktop\Rabbits_voc\annotations", '.xml')
     # ds.check()
     # ds.convert_data_to_coco_format(r"C:\Users\76572\Desktop\AILab\xedu\dataset\det\cats_and_dogs")
