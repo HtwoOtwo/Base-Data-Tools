@@ -741,24 +741,3 @@ class DataSet(object):
                 print(e)
 
 
-
-
-
-if __name__ == "__main__":
-    # Example usage
-    # dataset_dir = r"C:\Users\76572\Desktop\AILab\xedu\dataset\det\coco"
-    # # dataset_dir = r"C:\Users\76572\Desktop\AILab\xedu\dataset\cls\hand_gray"
-    # ds = DataSet(dataset_dir)
-    # #ds.readTag(r"C:\Users\76572\Desktop\AILab\xedu\dataset\cls\CatsDogs\classes.txt")
-    # #ds.check_imagenet_format()
-    # ds.check_coco_format()
-    # # ds.print_folder_structure(dataset_dir)
-
-    ds = DataSet(r"C:\Users\76572\Desktop\my_dataset")
-    ds.make_dataset(r"C:\Users\76572\Desktop\CatDog (2)", src_format="innolab")
-    #ds.make_dataset(r"C:\Users\76572\Desktop\AILab\xedu\dataset\cls\imagenet", src_format="imagenet")
-    #
-    #ds.check()
-    #ds.move_files(r"C:\Users\76572\Desktop\Rabbits_voc\train", r"C:\Users\76572\Desktop\Rabbits_voc\annotations", '.xml')
-    # ds.check()
-
