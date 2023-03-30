@@ -392,4 +392,35 @@ class TextData(object):
 
     def to_tensor(self):
         pass
+   
+class ModelData(object):
 
+    def __init__(self, path):
+        self.path = path
+
+    def extract_labels(self):
+        assert isinstance(self.path, str)
+        file_path = self.path
+        class_name = []
+        key = 'CLASSES'
+        if file_path[-3:] == 'txt':
+            with open(file_path, 'r') as f:
+                class_name = [tag.strip() for tag in f.readlines()]
+        elif file_path[-3:] == 'pth':
+            import torch
+            state_dict = torch.load(file_path, map_location=torch.device('cpu'))
+            if key in state_dict['meta']:
+                class_name = state_dict['meta'][key]
+        elif file_path[-4:] == 'onnx':
+            import onnxruntime
+            sess = onnxruntime.InferenceSession(file_path)
+            model_meta = sess.get_modelmeta()
+            if key in model_meta.custom_metadata_map:
+                unicode_string = model_meta.custom_metadata_map[key]
+                class_name = unicode_string.split('|')
+        else:
+            file_allow = ['txt', 'pth', 'onnx']
+            print('This function currently supports file formats in {}, please check the path'.format(file_allow))
+        if len(class_name) == 0:
+            print('Class_name in model is empty. Please use model generate by MMEdu')
+        return class_name
