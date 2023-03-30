@@ -417,7 +417,7 @@ class ModelData(object):
             model_meta = sess.get_modelmeta()
             if key in model_meta.custom_metadata_map:
                 unicode_string = model_meta.custom_metadata_map[key]
-                class_name = unicode_string.split(',')
+                class_name = unicode_string.split('|')
         else:
             file_allow = ['txt', 'pth', 'onnx']
             print('This function currently supports file formats in {}, please check the path'.format(file_allow))
