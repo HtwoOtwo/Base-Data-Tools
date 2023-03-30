@@ -297,13 +297,16 @@ class ImageData(object):
         plt.imshow(img)
         plt.show()
 
-    def map_orig_coords(self, box):
+    def map_orig_coords(self, boxes):
         #TODO 暂时只支持box的映射，后续应该支持单纯的坐标映射
         original_w, original_h = self.raw_value.shape[:2]
         processed_w, processed_h = self.value.shape[:2]
-        x1, y1, x2, y2, score = box
         sx, sy = original_w / processed_w, original_h / processed_h
-        return x1 * sx, y1 * sy, x2 * sx, y2 * sy, score
+        new_boxes = np.array([]).reshape(0, 5)
+        for box in boxes:
+            new_box = [box[0] * sx, box[1] * sy, box[2] * sx, box[3] * sy, box[4]]
+            new_boxes = np.concatenate([new_boxes, [new_box]], axis=0)
+        return new_boxes
 
 class TextData(object):
     _defaults = {
