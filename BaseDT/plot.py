@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 from enum import Enum
 import matplotlib.pyplot as plt
+import json
 # def draw_boxes(image, boxes, labels = None, color=(0, 0, 255), thickness=2):
 #     font_scale = image.shape[0] / 500
 #     font = cv2.FONT_HERSHEY_SIMPLEX
@@ -155,3 +156,52 @@ def imshow_det_bboxes(img,
     if show:
         imshow(img, win_name, wait_time)
     return img
+
+def plot_log(log_path, acc_key= 'accuracy_top-1', plot_list=None):
+    if plot_list is None:
+        plot_list = ['acc', 'loss']
+
+    if isinstance(plot_list, str):
+        plot_list = [plot_list]
+    elif isinstance(plot_list, (list, tuple)):
+        assert len(plot_list) == len(set(plot_list)), (
+            'Find duplicate elements in "plot_list".')
+    for key in plot_list:
+        assert key in ['acc','loss']
+
+    loss_x = []  # 用于存放loss值的横坐标
+    loss_y = []  # 用于存放loss值
+    acc_x = []  # 用于存放acc值的横坐标
+    acc_y = []  # 用于存放acc值
+    iter_num = 10
+    with open(log_path,'r') as f:  # 指定日志文件
+        content = f.readlines()
+        min_loss = 99
+        current_epoch = 1
+        for line in content:
+            log = json.loads(line) # 把每一行的json字符串转换成dict字典类型
+            if 'mode' in log.keys() and  current_epoch < int(log["epoch"]):
+                loss_y.append(min_loss/3)
+                loss_x.append(current_epoch)
+                min_loss = 99
+            if 'mode' in log.keys() and log["mode"] == "val":
+                acc_y.append(float(log[acc_key])/100)
+                acc_x.append(int(log["epoch"]))
+            if 'mode' in log.keys() and log["mode"] == "train":
+                if int(log["loss"]) < min_loss:
+                    min_loss = float(log["loss"])
+                    current_epoch = int(log["epoch"])
+    loss_y.append(min_loss/3)
+    loss_x.append(current_epoch)
+
+    plt.figure(figsize=(8,6))
+    if 'loss' in plot_list:
+        plt.plot(loss_x,loss_y,'',label="loss")
+    if 'acc' in plot_list:
+        plt.plot(acc_x,acc_y,'',label="acc")
+    plt.title('_'.join(plot_list))
+    plt.legend(loc='upper right')
+    plt.xlabel('epoch')
+    plt.ylabel('')
+    plt.grid(loss_x)
+    plt.show()
