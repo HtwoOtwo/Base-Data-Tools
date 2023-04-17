@@ -84,8 +84,7 @@ def imshow(img, need_win = False, win_name='', wait_time=0):
     else:
         plt.imshow(img)
         plt.show()
-
-
+        
 def imshow_det_bboxes(img,
                       bboxes,
                       labels,
@@ -100,7 +99,7 @@ def imshow_det_bboxes(img,
                       wait_time=0):
     """Draw bboxes and class labels (with scores) on an image.
     Args:
-        img (str or ndarray): The image to be displayed.
+        img (str or nparray): The image to be displayed.
         bboxes (ndarray): Bounding boxes (with scores), shaped (n, 4) or
             (n, 5).
         labels (ndarray): Labels of bboxes.
@@ -122,7 +121,9 @@ def imshow_det_bboxes(img,
     assert labels.ndim == 1
     assert bboxes.shape[0] == labels.shape[0]
     assert bboxes.shape[1] == 4 or bboxes.shape[1] == 5
-    img = cv2.imread(img)
+    assert isinstance(img,str) or isinstance(img, np.ndarray)
+    if isinstance(img, str):
+        img = cv2.imread(img)
     img = np.ascontiguousarray(img)
 
     if score_thr > 0:
