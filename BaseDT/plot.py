@@ -99,7 +99,7 @@ def imshow_det_bboxes(img,
                       wait_time=0):
     """Draw bboxes and class labels (with scores) on an image.
     Args:
-        img (str or nparray): The image to be displayed.
+        img (str or ndarray): The image to be displayed.
         bboxes (ndarray): Bounding boxes (with scores), shaped (n, 4) or
             (n, 5).
         labels (ndarray): Labels of bboxes.
