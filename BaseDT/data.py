@@ -401,7 +401,7 @@ class ModelData(object):
     def __init__(self, path):
         self.path = path
 
-    def extract_labels(self):
+    def get_labels(self):
         assert isinstance(self.path, str)
         file_path = self.path
         class_name = []

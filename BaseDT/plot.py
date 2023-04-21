@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 from enum import Enum
 import matplotlib.pyplot as plt
+import json
 # def draw_boxes(image, boxes, labels = None, color=(0, 0, 255), thickness=2):
 #     font_scale = image.shape[0] / 500
 #     font = cv2.FONT_HERSHEY_SIMPLEX
@@ -83,8 +84,7 @@ def imshow(img, need_win = False, win_name='', wait_time=0):
     else:
         plt.imshow(img)
         plt.show()
-
-
+        
 def imshow_det_bboxes(img,
                       bboxes,
                       labels,
@@ -121,7 +121,9 @@ def imshow_det_bboxes(img,
     assert labels.ndim == 1
     assert bboxes.shape[0] == labels.shape[0]
     assert bboxes.shape[1] == 4 or bboxes.shape[1] == 5
-    img = cv2.imread(img)
+    assert isinstance(img,str) or isinstance(img, np.ndarray)
+    if isinstance(img, str):
+        img = cv2.imread(img)
     img = np.ascontiguousarray(img)
 
     if score_thr > 0:
@@ -155,3 +157,48 @@ def imshow_det_bboxes(img,
     if show:
         imshow(img, win_name, wait_time)
     return img
+
+def plot_log(log_path, title='训练损失函数图', plot_list='loss'):
+
+    if isinstance(plot_list, str):
+        plot_list = [plot_list]
+    elif isinstance(plot_list, (list, tuple)):
+        assert len(plot_list) == len(set(plot_list)), (
+            'Find duplicate elements in "plot_list".')
+    for key in plot_list:
+        assert key in ['loss','loss_cls','loss_bbox']
+
+    plt.rcParams['font.sans-serif'] = ['SimHei']
+    plt.rcParams['axes.unicode_minus'] = False
+
+    iter = []
+    loss_dict = {
+        'loss': [],
+        'loss_cls':[],
+        'loss_bbox':[]
+    }
+
+    iter_num = 0
+    with open(log_path,'r') as f:
+        content = f.readlines()
+        for line in content:
+            log = json.loads(line)
+            if 'mode' in log.keys() and log["mode"] == 'train':
+                iter_num += 10
+                iter.append(iter_num)
+                non_empty_keys = log.keys()
+                for axis_y in plot_list:
+                    loss_dict[axis_y].append(log[axis_y])
+
+    plt.figure(figsize=(8,6))
+    for axis_y in plot_list:
+        plt.plot(iter,loss_dict[axis_y],'',label=axis_y)
+    plt.title(title)
+    plt.legend(loc='upper right')
+    plt.xlabel('iter')
+    plt.ylabel('')
+    plt.grid(True)
+    plt.show()
+    non_empty_keys = [key for key in non_empty_keys if key.startswith('loss')]
+    print('The loss function graph is drawn. If you want to add y-axis parameters,'
+          f'please set `{non_empty_keys}` in the plot_list')
